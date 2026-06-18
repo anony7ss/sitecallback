@@ -1,0 +1,16 @@
+{
+  "name": "discord-restore-oauth-callback",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Netlify callback for Discord OAuth2 member restore",
+  "scripts": {
+    "dev": "netlify dev",
+    "check": "node --check netlify/functions/oauth-callback.js && node --check netlify/functions/oauth-health.js"
+  },
+  "dependencies": {
+    "mongodb": "^6.12.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.38.1"
+  }
+}
