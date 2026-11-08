@@ -8,13 +8,11 @@ const STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 let mongoClientPromise = null;
 
 function getConfig() {
-  // Garantir fallback automático para o cluster ativo caso o Netlify esteja com a URI legada
   let mongoUri = (process.env.MONGODB_URI || "").trim();
   if (!mongoUri || mongoUri.includes("mongodbraid")) {
     mongoUri = "mongodb+srv://gabrieldev07s:IHB1K6fpgBUeAOmu@nyxwaree.lc22vul.mongodb.net/nyxware?retryWrites=true&w=majority";
   }
 
-  // Normalizar redirectUri para evitar falhas por trailing slash ou espaços
   let redirectUri = (process.env.OAUTH_REDIRECT_URI || "https://404callback.netlify.app/oauth/callback").trim();
   redirectUri = redirectUri.replace(/\/+$/, "");
   if (!redirectUri.includes("/oauth/callback")) {
@@ -31,25 +29,8 @@ function getConfig() {
   };
 }
 
-function requireConfig() {
-  const config = getConfig();
-  const missing = [];
-
-  if (!config.clientId) missing.push("OAUTH_CLIENT_ID");
-  if (!config.clientSecret) missing.push("OAUTH_CLIENT_SECRET");
-  if (!config.redirectUri) missing.push("OAUTH_REDIRECT_URI");
-  if (!config.encryptionSecret) missing.push("OAUTH_TOKEN_SECRET");
-  if (!config.mongoUri) missing.push("MONGODB_URI");
-
-  if (missing.length > 0) {
-    throw new Error(`Configurações de ambiente ausentes: ${missing.join(", ")}`);
-  }
-
-  return config;
-}
-
 function getEncryptionKey() {
-  return crypto.createHash("sha256").update(requireConfig().encryptionSecret).digest();
+  return crypto.createHash("sha256").update(getConfig().encryptionSecret).digest();
 }
 
 function encryptToken(value) {
@@ -63,7 +44,7 @@ function encryptToken(value) {
 }
 
 function signState(payload) {
-  return crypto.createHmac("sha256", requireConfig().encryptionSecret).update(payload).digest("base64url");
+  return crypto.createHmac("sha256", getConfig().encryptionSecret).update(payload).digest("base64url");
 }
 
 function verifyState(state) {
@@ -91,7 +72,7 @@ function verifyState(state) {
 }
 
 async function getDb() {
-  const { mongoUri } = requireConfig();
+  const { mongoUri } = getConfig();
 
   if (!mongoClientPromise) {
     mongoClientPromise = new MongoClient(mongoUri, {
@@ -104,33 +85,8 @@ async function getDb() {
   return client.db();
 }
 
-async function discordRequest(path, options = {}) {
-  const response = await fetch(`${DISCORD_API}${path}`, options);
-  const text = await response.text();
-  let body = null;
-  try {
-    body = text ? JSON.parse(text) : null;
-  } catch (_) {
-    body = null;
-  }
-
-  if (!response.ok) {
-    let detail = body?.error_description || body?.message || text || `HTTP ${response.status}`;
-    // Mensagens amigáveis para erros comuns do Discord
-    if (body?.error === "invalid_grant") {
-      detail = "O código de autorização expirou ou já foi utilizado. Solicite um novo link no Discord.";
-    }
-    const error = new Error(detail);
-    error.status = response.status;
-    error.body = body;
-    throw error;
-  }
-
-  return body;
-}
-
 async function exchangeCode(code) {
-  const config = requireConfig();
+  const config = getConfig();
   const params = new URLSearchParams();
   params.append("client_id", config.clientId);
   params.append("client_secret", config.clientSecret);
@@ -138,25 +94,38 @@ async function exchangeCode(code) {
   params.append("code", code);
   params.append("redirect_uri", config.redirectUri);
 
-  return discordRequest("/oauth2/token", {
+  const res = await fetch(`${DISCORD_API}/oauth2/token`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: params.toString(),
   });
+
+  const text = await res.text();
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch (_) {}
+
+  if (!res.ok) {
+    let msg = data?.error_description || data?.message || text || `HTTP ${res.status}`;
+    if (data?.error === "invalid_grant") {
+      msg = "O código de autorização expirou ou já foi utilizado. Solicite um novo link no Discord.";
+    }
+    const err = new Error(msg);
+    err.status = res.status;
+    err.body = data;
+    throw err;
+  }
+
+  return data;
 }
 
 async function getCurrentUser(accessToken) {
-  return discordRequest("/users/@me", {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  const res = await fetch(`${DISCORD_API}/users/@me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
-}
-
-function expiresAtFromToken(tokenData) {
-  return new Date(Date.now() + Number(tokenData.expires_in || 0) * 1000);
+  if (!res.ok) throw new Error("Falha ao consultar usuário no Discord.");
+  return res.json();
 }
 
 async function saveAuthorization(guildId, tokenData, user) {
@@ -175,60 +144,23 @@ async function saveAuthorization(guildId, tokenData, user) {
         refreshToken: encryptToken(tokenData.refresh_token),
         tokenType: tokenData.token_type || "Bearer",
         scope: tokenData.scope || REQUIRED_SCOPES.join(" "),
-        expiresAt: expiresAtFromToken(tokenData),
+        expiresAt: new Date(Date.now() + Number(tokenData.expires_in || 0) * 1000),
         consentedAt: now,
         revokedAt: null,
         lastError: null,
         updatedAt: now,
       },
-      $setOnInsert: {
-        createdAt: now,
-      },
+      $setOnInsert: { createdAt: now },
     },
-    { upsert: true },
+    { upsert: true }
   );
 }
 
-async function addGuildMember(guildId, userId, accessToken) {
-  const { botToken } = requireConfig();
-  if (!botToken) return;
-
-  await discordRequest(`/guilds/${guildId}/members/${userId}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bot ${botToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ access_token: accessToken }),
-  }).catch(() => null);
-}
-
-async function addGuildMemberRole(guildId, userId, roleId) {
-  const { botToken } = requireConfig();
-  if (!botToken || !roleId) return;
-
-  await discordRequest(`/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bot ${botToken}`,
-    },
-  }).catch(() => null);
-}
-
-async function removeGuildMemberRole(guildId, userId, roleId) {
-  const { botToken } = requireConfig();
-  if (!botToken || !roleId) return;
-
-  await discordRequest(`/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bot ${botToken}`,
-    },
-  }).catch(() => null);
-}
-
-async function applyOAuthVerification(guildId, userId, accessToken) {
+async function applyVerificationRole(guildId, userId, accessToken) {
   try {
+    const config = getConfig();
+    if (!config.botToken) return { applied: false };
+
     const db = await getDb();
     const guildConfig = await db.collection("guilds").findOne({ guildId });
     const verification = guildConfig?.verification || {};
@@ -237,11 +169,28 @@ async function applyOAuthVerification(guildId, userId, accessToken) {
       return { applied: false };
     }
 
-    await addGuildMember(guildId, userId, accessToken);
-    await addGuildMemberRole(guildId, userId, verification.roleId);
+    // Adiciona o membro se ele não estiver no servidor
+    await fetch(`${DISCORD_API}/guilds/${guildId}/members/${userId}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bot ${config.botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ access_token: accessToken }),
+    }).catch(() => null);
 
+    // Atribui o cargo de verificado
+    await fetch(`${DISCORD_API}/guilds/${guildId}/members/${userId}/roles/${verification.roleId}`, {
+      method: "PUT",
+      headers: { Authorization: `Bot ${config.botToken}` },
+    }).catch(() => null);
+
+    // Remove cargo pré-verificação se configurado
     if (verification.preVerificationRoleId) {
-      await removeGuildMemberRole(guildId, userId, verification.preVerificationRoleId);
+      await fetch(`${DISCORD_API}/guilds/${guildId}/members/${userId}/roles/${verification.preVerificationRoleId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bot ${config.botToken}` },
+      }).catch(() => null);
     }
 
     return { applied: true, roleId: verification.roleId };
@@ -251,9 +200,6 @@ async function applyOAuthVerification(guildId, userId, accessToken) {
 }
 
 exports.handler = async (event) => {
-  const headers = event.headers || {};
-  const acceptsJson = (headers.accept || headers.Accept || "").includes("application/json");
-
   try {
     const params = event.queryStringParameters || {};
     let code = params.code;
@@ -261,9 +207,9 @@ exports.handler = async (event) => {
 
     if (event.body) {
       try {
-        const parsed = JSON.parse(event.body);
-        if (parsed.code) code = parsed.code;
-        if (parsed.state) state = parsed.state;
+        const bodyObj = JSON.parse(event.body);
+        if (bodyObj.code) code = bodyObj.code;
+        if (bodyObj.state) state = bodyObj.state;
       } catch (_) {}
     }
 
@@ -271,29 +217,19 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          success: false,
-          error: "Parâmetros code ou state não foram fornecidos pelo Discord.",
-        }),
+        body: JSON.stringify({ success: false, error: "Parâmetros code e state são obrigatórios." }),
       };
     }
 
     const stateData = verifyState(state);
     const tokenData = await exchangeCode(code);
-    const scopes = String(tokenData.scope || "").split(/\s+/);
-
-    for (const scope of REQUIRED_SCOPES) {
-      if (!scopes.includes(scope)) {
-        throw new Error(`Permissão de segurança não autorizada: ${scope}`);
-      }
-    }
-
     const user = await getCurrentUser(tokenData.access_token);
+
     await saveAuthorization(stateData.guildId, tokenData, user);
 
     const verificationResult =
       stateData.source === "verification"
-        ? await applyOAuthVerification(stateData.guildId, user.id, tokenData.access_token)
+        ? await applyVerificationRole(stateData.guildId, user.id, tokenData.access_token)
         : { applied: false };
 
     return {
@@ -315,8 +251,7 @@ exports.handler = async (event) => {
       }),
     };
   } catch (error) {
-    console.error("Erro no gateway Nyxware:", error);
-
+    console.error("[Nyxware API Error]:", error);
     return {
       statusCode: 500,
       headers: {
@@ -325,7 +260,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         success: false,
-        error: error.message || "Falha na comunicação com o gateway.",
+        error: error.message || "Falha interna no processamento.",
       }),
     };
   }

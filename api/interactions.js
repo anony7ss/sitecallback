@@ -1,13 +1,8 @@
 const crypto = require("crypto");
 
-/**
- * Validação nativa da assinatura Ed25519 do Discord (Node.js 18+ / 24)
- * Não requer nenhuma dependência externa (tweetnacl, etc.)
- */
 function verifySignature(body, signature, timestamp, clientPublicKey) {
   if (!signature || !timestamp || !clientPublicKey) return false;
   try {
-    // DER prefix para chave pública Ed25519: 302a300506032b6570032100 (12 bytes)
     const publicKeyDer = Buffer.concat([
       Buffer.from("302a300506032b6570032100", "hex"),
       Buffer.from(clientPublicKey, "hex"),
@@ -21,14 +16,12 @@ function verifySignature(body, signature, timestamp, clientPublicKey) {
       publicKeyPem,
       Buffer.from(signature, "hex")
     );
-  } catch (err) {
-    console.error("Erro na verificação de assinatura Discord:", err);
+  } catch (_) {
     return false;
   }
 }
 
 exports.handler = async (event) => {
-  // Apenas aceita requisições POST
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
@@ -43,7 +36,6 @@ exports.handler = async (event) => {
 
   const publicKey = (process.env.DISCORD_PUBLIC_KEY || "").trim();
 
-  // Se a chave pública estiver configurada, valida a assinatura criptográfica
   if (publicKey) {
     const isValid = verifySignature(rawBody, signature, timestamp, publicKey);
     if (!isValid) {
@@ -71,11 +63,10 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: 1 }), // PONG
+      body: JSON.stringify({ type: 1 }),
     };
   }
 
-  // Resposta padrão para outros tipos de interação
   return {
     statusCode: 200,
     headers: { "Content-Type": "application/json" },

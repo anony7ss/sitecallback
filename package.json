@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "node --check netlify/functions/oauth-callback.js && node --check netlify/functions/oauth-health.js"
+    "check": "node --check api/callback.js && node --check api/health.js && node --check api/interactions.js && node --check api/webhooks.js && node --check api/linked-roles.js"
   },
   "dependencies": {
     "lucide-react": "^0.460.0",

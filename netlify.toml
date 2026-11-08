@@ -1,58 +1,45 @@
 [build]
   command = "npm run build"
   publish = "dist"
-  functions = "netlify/functions"
+  functions = "api"
 
 [functions]
   node_bundler = "esbuild"
 
-# 1. API Endpoints
+# 1. Endpoints de API Real (direto para api/*.js)
+[[redirects]]
+  from = "/api/callback"
+  to = "/.netlify/functions/callback"
+  status = 200
+
 [[redirects]]
   from = "/api/oauth-callback"
-  to = "/.netlify/functions/oauth-callback"
+  to = "/.netlify/functions/callback"
   status = 200
 
 [[redirects]]
   from = "/api/health"
-  to = "/.netlify/functions/oauth-health"
+  to = "/.netlify/functions/health"
   status = 200
 
-# Endpoint de Interações HTTP (Interactions Endpoint URL)
 [[redirects]]
   from = "/api/interactions"
-  to = "/.netlify/functions/discord-interactions"
+  to = "/.netlify/functions/interactions"
   status = 200
 
-# Endpoint de Event Webhooks
 [[redirects]]
   from = "/api/webhooks"
-  to = "/.netlify/functions/discord-webhooks"
+  to = "/.netlify/functions/webhooks"
   status = 200
 
-# Endpoint de Verificação de Cargos Vinculados (Linked Roles OAuth)
 [[redirects]]
   from = "/api/linked-roles"
   to = "/.netlify/functions/linked-roles"
   status = 200
 
-# 2. SPA Frontend Routes
+# 2. Rotas do Frontend SPA (React Vite)
 [[redirects]]
   from = "/oauth/callback"
-  to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/linked-roles"
-  to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/privacy"
-  to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/terms"
   to = "/index.html"
   status = 200
 

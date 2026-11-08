@@ -24,15 +24,6 @@ exports.handler = async () => {
   const mongoUri = process.env.MONGODB_URI;
   const dbStatus = await checkDatabase(mongoUri);
 
-  const envCheck = {
-    OAUTH_CLIENT_ID: Boolean(process.env.OAUTH_CLIENT_ID || process.env.DISCORD_CLIENT_ID),
-    OAUTH_CLIENT_SECRET: Boolean(process.env.OAUTH_CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET),
-    OAUTH_REDIRECT_URI: Boolean(process.env.OAUTH_REDIRECT_URI || process.env.DISCORD_OAUTH_REDIRECT_URI),
-    OAUTH_TOKEN_SECRET: Boolean(process.env.OAUTH_TOKEN_SECRET || process.env.TOKEN_ENCRYPTION_KEY),
-    MONGODB_URI: Boolean(mongoUri),
-    DISCORD_TOKEN: Boolean(process.env.DISCORD_TOKEN),
-  };
-
   return {
     statusCode: 200,
     headers: {
@@ -45,7 +36,14 @@ exports.handler = async () => {
       version: "2.5.0",
       timestamp: new Date().toISOString(),
       database: dbStatus,
-      env: envCheck,
+      env: {
+        OAUTH_CLIENT_ID: Boolean(process.env.OAUTH_CLIENT_ID || process.env.DISCORD_CLIENT_ID),
+        OAUTH_CLIENT_SECRET: Boolean(process.env.OAUTH_CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET),
+        OAUTH_REDIRECT_URI: Boolean(process.env.OAUTH_REDIRECT_URI || process.env.DISCORD_OAUTH_REDIRECT_URI),
+        OAUTH_TOKEN_SECRET: Boolean(process.env.OAUTH_TOKEN_SECRET || process.env.TOKEN_ENCRYPTION_KEY),
+        MONGODB_URI: Boolean(mongoUri),
+        DISCORD_TOKEN: Boolean(process.env.DISCORD_TOKEN),
+      },
     }),
   };
 };

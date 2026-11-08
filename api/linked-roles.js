@@ -35,7 +35,6 @@ async function updateLinkedRoleMetadata(accessToken) {
   const config = getConfig();
   const url = `${DISCORD_API}/users/@me/applications/${config.clientId}/role-connection`;
 
-  // Dados do cargo vinculado (metadados personalizados da Nyxware)
   const body = {
     platform_name: "Nyxware Identity",
     platform_username: "Membro Verificado",
@@ -61,7 +60,6 @@ exports.handler = async (event) => {
   const config = getConfig();
   const code = event.queryStringParameters?.code;
 
-  // Se não tem code, redireciona para autorização OAuth2 com role_connections.write
   if (!code) {
     const authUrl = new URL("https://discord.com/oauth2/authorize");
     authUrl.searchParams.set("client_id", config.clientId);
@@ -72,31 +70,23 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 302,
-      headers: {
-        Location: authUrl.toString(),
-      },
+      headers: { Location: authUrl.toString() },
     };
   }
 
-  // Se tem code, troca pelo token e grava os metadados do cargo vinculado
   try {
     const tokenData = await exchangeLinkedRolesCode(code);
     await updateLinkedRoleMetadata(tokenData.access_token);
 
-    // Redireciona para a página de sucesso dos Linked Roles
     return {
       statusCode: 302,
-      headers: {
-        Location: "/linked-roles?success=true",
-      },
+      headers: { Location: "/linked-roles?success=true" },
     };
   } catch (err) {
     console.error("Erro ao vincular cargo:", err);
     return {
       statusCode: 302,
-      headers: {
-        Location: `/linked-roles?error=${encodeURIComponent(err.message)}`,
-      },
+      headers: { Location: `/linked-roles?error=${encodeURIComponent(err.message)}` },
     };
   }
 };

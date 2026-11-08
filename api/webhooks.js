@@ -1,9 +1,5 @@
 const crypto = require("crypto");
 
-/**
- * Validação nativa da assinatura Ed25519 do Discord Webhook Events (Node.js 18+ / 24)
- * Suporta o handshake oficial do Discord (PING type: 1) e eventos de ciclo de vida
- */
 function verifySignature(body, signature, timestamp, clientPublicKey) {
   if (!signature || !timestamp || !clientPublicKey) return false;
   try {
@@ -20,8 +16,7 @@ function verifySignature(body, signature, timestamp, clientPublicKey) {
       publicKeyPem,
       Buffer.from(signature, "hex")
     );
-  } catch (err) {
-    console.error("Erro na verificação do webhook Discord:", err);
+  } catch (_) {
     return false;
   }
 }
@@ -41,7 +36,6 @@ exports.handler = async (event) => {
 
   const publicKey = (process.env.DISCORD_PUBLIC_KEY || "").trim();
 
-  // Validação obrigatória da assinatura Ed25519 do Discord
   if (publicKey) {
     const isValid = verifySignature(rawBody, signature, timestamp, publicKey);
     if (!isValid) {
@@ -73,11 +67,10 @@ exports.handler = async (event) => {
     };
   }
 
-  // Processamento de Eventos (APPLICATION_AUTHORIZED, APPLICATION_DEAUTHORIZED, etc.)
-  console.log(`[Nyxware Webhook] Evento recebido: ${payload.event?.type || payload.type || "Desconhecido"}`);
+  console.log(`[Nyxware Webhook Event]: ${payload.event?.type || payload.type || "Desconhecido"}`);
 
   return {
-    statusCode: 204, // No Content
+    statusCode: 204,
     headers: { "Content-Type": "application/json" },
     body: "",
   };
