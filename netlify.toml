@@ -6,6 +6,7 @@
 [functions]
   node_bundler = "esbuild"
 
+# 1. API Endpoints
 [[redirects]]
   from = "/api/oauth-callback"
   to = "/.netlify/functions/oauth-callback"
@@ -16,8 +17,42 @@
   to = "/.netlify/functions/oauth-health"
   status = 200
 
+# Endpoint de Interações HTTP (Interactions Endpoint URL)
+[[redirects]]
+  from = "/api/interactions"
+  to = "/.netlify/functions/discord-interactions"
+  status = 200
+
+# Endpoint de Event Webhooks
+[[redirects]]
+  from = "/api/webhooks"
+  to = "/.netlify/functions/discord-webhooks"
+  status = 200
+
+# Endpoint de Verificação de Cargos Vinculados (Linked Roles OAuth)
+[[redirects]]
+  from = "/api/linked-roles"
+  to = "/.netlify/functions/linked-roles"
+  status = 200
+
+# 2. SPA Frontend Routes
 [[redirects]]
   from = "/oauth/callback"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/linked-roles"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/privacy"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/terms"
   to = "/index.html"
   status = 200
 
