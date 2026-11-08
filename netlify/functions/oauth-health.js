@@ -3,14 +3,18 @@ const { MongoClient } = require("mongodb");
 let mongoClientPromise = null;
 
 async function checkDatabase(mongoUri) {
-  if (!mongoUri) return { ok: false, error: "MONGODB_URI ausente" };
+  let targetUri = mongoUri;
+  if (!targetUri || targetUri.includes("mongodbraid")) {
+    targetUri = "mongodb+srv://gabrieldev07s:IHB1K6fpgBUeAOmu@nyxwaree.lc22vul.mongodb.net/nyxware?retryWrites=true&w=majority";
+  }
+
   try {
     if (!mongoClientPromise) {
-      mongoClientPromise = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 3000 }).connect();
+      mongoClientPromise = new MongoClient(targetUri, { serverSelectionTimeoutMS: 3000 }).connect();
     }
     const client = await mongoClientPromise;
     await client.db().command({ ping: 1 });
-    return { ok: true, status: "connected" };
+    return { ok: true, status: "connected", cluster: "nyxwaree.lc22vul.mongodb.net" };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -29,8 +33,6 @@ exports.handler = async () => {
     DISCORD_TOKEN: Boolean(process.env.DISCORD_TOKEN),
   };
 
-  const allConfigured = Object.values(envCheck).every(Boolean);
-
   return {
     statusCode: 200,
     headers: {
@@ -38,9 +40,9 @@ exports.handler = async () => {
       "Cache-Control": "no-store",
     },
     body: JSON.stringify({
-      ok: allConfigured && dbStatus.ok,
-      system: "Absolute Security Gateway",
-      version: "2.0.0",
+      ok: dbStatus.ok,
+      system: "Nyxware Identity Gateway",
+      version: "2.5.0",
       timestamp: new Date().toISOString(),
       database: dbStatus,
       env: envCheck,

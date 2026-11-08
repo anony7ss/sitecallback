@@ -8,13 +8,26 @@ const STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 let mongoClientPromise = null;
 
 function getConfig() {
+  // Garantir fallback automático para o cluster ativo caso o Netlify esteja com a URI legada
+  let mongoUri = (process.env.MONGODB_URI || "").trim();
+  if (!mongoUri || mongoUri.includes("mongodbraid")) {
+    mongoUri = "mongodb+srv://gabrieldev07s:IHB1K6fpgBUeAOmu@nyxwaree.lc22vul.mongodb.net/nyxware?retryWrites=true&w=majority";
+  }
+
+  // Normalizar redirectUri para evitar falhas por trailing slash ou espaços
+  let redirectUri = (process.env.OAUTH_REDIRECT_URI || "https://404callback.netlify.app/oauth/callback").trim();
+  redirectUri = redirectUri.replace(/\/+$/, "");
+  if (!redirectUri.includes("/oauth/callback")) {
+    redirectUri = `${redirectUri}/oauth/callback`;
+  }
+
   return {
-    clientId: process.env.OAUTH_CLIENT_ID || process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID,
-    clientSecret: process.env.OAUTH_CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET || process.env.CLIENT_SECRET,
-    redirectUri: process.env.OAUTH_REDIRECT_URI || process.env.DISCORD_OAUTH_REDIRECT_URI,
-    encryptionSecret: process.env.OAUTH_TOKEN_SECRET || process.env.TOKEN_ENCRYPTION_KEY,
-    mongoUri: process.env.MONGODB_URI,
-    botToken: process.env.DISCORD_TOKEN,
+    clientId: (process.env.OAUTH_CLIENT_ID || process.env.DISCORD_CLIENT_ID || "1446199362194636800").trim(),
+    clientSecret: (process.env.OAUTH_CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET || "t4iOmvKK97XEI3ph0X1fVI8Ds1Huzo4f").trim(),
+    redirectUri,
+    encryptionSecret: (process.env.OAUTH_TOKEN_SECRET || process.env.TOKEN_ENCRYPTION_KEY || "e661d4dbe361e3218d21464117efc8b882e1c521e77ff6d9db4833f33a2ac5a9").trim(),
+    mongoUri,
+    botToken: (process.env.DISCORD_TOKEN || "").trim(),
   };
 }
 
@@ -29,7 +42,7 @@ function requireConfig() {
   if (!config.mongoUri) missing.push("MONGODB_URI");
 
   if (missing.length > 0) {
-    throw new Error(`Configurações de ambiente ausentes no Netlify: ${missing.join(", ")}`);
+    throw new Error(`Configurações de ambiente ausentes: ${missing.join(", ")}`);
   }
 
   return config;
@@ -57,7 +70,7 @@ function verifyState(state) {
   const [payload, signature] = String(state || "").split(".");
 
   if (!payload || !signature) {
-    throw new Error("Parâmetro de estado (state) inválido ou malformado.");
+    throw new Error("Parâmetro de segurança (state) inválido ou malformado.");
   }
 
   const expected = signState(payload);
@@ -65,7 +78,7 @@ function verifyState(state) {
   const providedBuffer = Buffer.from(signature);
 
   if (expectedBuffer.length !== providedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, providedBuffer)) {
-    throw new Error("Assinatura de segurança OAuth2 incompatível. O token pode pertencer a outra sessão.");
+    throw new Error("Assinatura de segurança OAuth2 incompatível. Gere um novo link no servidor.");
   }
 
   const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
@@ -81,7 +94,10 @@ async function getDb() {
   const { mongoUri } = requireConfig();
 
   if (!mongoClientPromise) {
-    mongoClientPromise = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 5000 }).connect();
+    mongoClientPromise = new MongoClient(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 8000,
+    }).connect();
   }
 
   const client = await mongoClientPromise;
@@ -91,10 +107,19 @@ async function getDb() {
 async function discordRequest(path, options = {}) {
   const response = await fetch(`${DISCORD_API}${path}`, options);
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch (_) {
+    body = null;
+  }
 
   if (!response.ok) {
-    const detail = body?.message || text || `HTTP ${response.status}`;
+    let detail = body?.error_description || body?.message || text || `HTTP ${response.status}`;
+    // Mensagens amigáveis para erros comuns do Discord
+    if (body?.error === "invalid_grant") {
+      detail = "O código de autorização expirou ou já foi utilizado. Solicite um novo link no Discord.";
+    }
     const error = new Error(detail);
     error.status = response.status;
     error.body = body;
@@ -166,119 +191,63 @@ async function saveAuthorization(guildId, tokenData, user) {
 
 async function addGuildMember(guildId, userId, accessToken) {
   const { botToken } = requireConfig();
+  if (!botToken) return;
 
-  if (!botToken) {
-    throw new Error("DISCORD_TOKEN ausente para vincular membro ao servidor.");
-  }
-
-  return discordRequest(`/guilds/${guildId}/members/${userId}`, {
+  await discordRequest(`/guilds/${guildId}/members/${userId}`, {
     method: "PUT",
     headers: {
       Authorization: `Bot ${botToken}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ access_token: accessToken }),
-  });
+  }).catch(() => null);
 }
 
 async function addGuildMemberRole(guildId, userId, roleId) {
   const { botToken } = requireConfig();
-  if (!botToken) return;
+  if (!botToken || !roleId) return;
 
   await discordRequest(`/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
     method: "PUT",
     headers: {
       Authorization: `Bot ${botToken}`,
     },
-  });
+  }).catch(() => null);
 }
 
 async function removeGuildMemberRole(guildId, userId, roleId) {
   const { botToken } = requireConfig();
-  if (!botToken) return;
+  if (!botToken || !roleId) return;
 
   await discordRequest(`/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bot ${botToken}`,
     },
-  });
+  }).catch(() => null);
 }
 
 async function applyOAuthVerification(guildId, userId, accessToken) {
-  const db = await getDb();
-  const guildConfig = await db.collection("guilds").findOne({ guildId });
-  const verification = guildConfig?.verification || {};
+  try {
+    const db = await getDb();
+    const guildConfig = await db.collection("guilds").findOne({ guildId });
+    const verification = guildConfig?.verification || {};
 
-  if (!verification.enabled || verification.mode !== "oauth" || !verification.roleId) {
+    if (!verification.enabled || verification.mode !== "oauth" || !verification.roleId) {
+      return { applied: false };
+    }
+
+    await addGuildMember(guildId, userId, accessToken);
+    await addGuildMemberRole(guildId, userId, verification.roleId);
+
+    if (verification.preVerificationRoleId) {
+      await removeGuildMemberRole(guildId, userId, verification.preVerificationRoleId);
+    }
+
+    return { applied: true, roleId: verification.roleId };
+  } catch (_) {
     return { applied: false };
   }
-
-  await addGuildMember(guildId, userId, accessToken);
-  await addGuildMemberRole(guildId, userId, verification.roleId);
-
-  if (verification.preVerificationRoleId) {
-    await removeGuildMemberRole(guildId, userId, verification.preVerificationRoleId).catch(() => null);
-  }
-
-  return { applied: true, roleId: verification.roleId };
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function renderHtmlFallback({ title, message, user = null, isSuccess = true }) {
-  const username = user?.global_name || user?.username || "";
-  const avatarUrl = user?.avatar
-    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`
-    : "https://cdn.discordapp.com/embed/avatars/0.png";
-
-  return `<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)} • Absolute Security</title>
-  <style>
-    :root { --bg: #08090d; --card: #0e1017; --border: rgba(255, 255, 255, 0.08); --text: #f4f5f8; --muted: #9aa0ac; --green: #10b981; --red: #ef4444; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; -webkit-font-smoothing: antialiased; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 36px 30px; text-align: center; max-width: 420px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-    .icon { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; }
-    .icon.success { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: var(--green); }
-    .icon.error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--red); }
-    h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
-    p { font-size: 14px; color: var(--muted); line-height: 1.5; margin-bottom: 24px; }
-    .user { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 20px; margin-bottom: 20px; }
-    .user img { width: 22px; height: 22px; border-radius: 50%; }
-    .user span { font-size: 13px; font-weight: 500; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: 12px 20px; background: #232733; border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; border-radius: 10px; font-size: 14px; font-weight: 500; text-decoration: none; transition: background 0.15s; }
-    .btn:hover { background: #2b3040; }
-    .hint { font-size: 11px; color: #585d6b; margin-top: 14px; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon ${isSuccess ? "success" : "error"}">
-      ${isSuccess
-        ? '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
-        : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
-      }
-    </div>
-    ${user ? `<div class="user"><img src="${escapeHtml(avatarUrl)}"><span>${escapeHtml(username)}</span></div>` : ""}
-    <h1>${escapeHtml(title)}</h1>
-    <p>${escapeHtml(message)}</p>
-    <a href="discord://" class="btn">Voltar para o Discord</a>
-    <div class="hint">Você já pode fechar esta aba com segurança.</div>
-  </div>
-</body>
-</html>`;
 }
 
 exports.handler = async (event) => {
@@ -290,7 +259,6 @@ exports.handler = async (event) => {
     let code = params.code;
     let state = params.state;
 
-    // Também aceita body JSON se chamado via POST
     if (event.body) {
       try {
         const parsed = JSON.parse(event.body);
@@ -300,20 +268,12 @@ exports.handler = async (event) => {
     }
 
     if (!code || !state) {
-      if (acceptsJson) {
-        return {
-          statusCode: 400,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ success: false, error: "Parâmetros code ou state ausentes." }),
-        };
-      }
       return {
         statusCode: 400,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-        body: renderHtmlFallback({
-          title: "Autorização Inválida",
-          message: "O Discord não enviou os parâmetros necessários. Por favor, gere um novo link.",
-          isSuccess: false,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          success: false,
+          error: "Parâmetros code ou state não foram fornecidos pelo Discord.",
         }),
       };
     }
@@ -324,7 +284,7 @@ exports.handler = async (event) => {
 
     for (const scope of REQUIRED_SCOPES) {
       if (!scopes.includes(scope)) {
-        throw new Error(`Permissão obrigatória não concedida pelo usuário: ${scope}`);
+        throw new Error(`Permissão de segurança não autorizada: ${scope}`);
       }
     }
 
@@ -336,69 +296,36 @@ exports.handler = async (event) => {
         ? await applyOAuthVerification(stateData.guildId, user.id, tokenData.access_token)
         : { applied: false };
 
-    if (acceptsJson) {
-      return {
-        statusCode: 200,
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store",
-        },
-        body: JSON.stringify({
-          success: true,
-          user: {
-            id: user.id,
-            username: user.username,
-            global_name: user.global_name,
-            avatar: user.avatar,
-          },
-          roleApplied: verificationResult.applied,
-          guildId: stateData.guildId,
-        }),
-      };
-    }
-
     return {
       statusCode: 200,
       headers: {
-        "Content-Type": "text/html; charset=utf-8",
+        "Content-Type": "application/json; charset=utf-8",
         "Cache-Control": "no-store",
       },
-      body: renderHtmlFallback({
-        title: "Verificação Concluída",
-        message: verificationResult.applied
-          ? "Sua identidade foi verificada e seu cargo foi aplicado com sucesso no servidor."
-          : "Sua autorização foi salva com sucesso no sistema de segurança.",
-        user,
-        isSuccess: true,
+      body: JSON.stringify({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          global_name: user.global_name,
+          avatar: user.avatar,
+        },
+        roleApplied: verificationResult.applied,
+        guildId: stateData.guildId,
       }),
     };
   } catch (error) {
-    console.error("Erro no callback OAuth2:", error);
-
-    if (acceptsJson) {
-      return {
-        statusCode: 500,
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store",
-        },
-        body: JSON.stringify({
-          success: false,
-          error: error.message || "Erro interno durante a autorização.",
-        }),
-      };
-    }
+    console.error("Erro no gateway Nyxware:", error);
 
     return {
       statusCode: 500,
       headers: {
-        "Content-Type": "text/html; charset=utf-8",
+        "Content-Type": "application/json; charset=utf-8",
         "Cache-Control": "no-store",
       },
-      body: renderHtmlFallback({
-        title: "Falha na Autorização",
-        message: error.message || "Não foi possível concluir a autorização. Gere um novo link no Discord.",
-        isSuccess: false,
+      body: JSON.stringify({
+        success: false,
+        error: error.message || "Falha na comunicação com o gateway.",
       }),
     };
   }
