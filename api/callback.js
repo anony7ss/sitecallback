@@ -8,24 +8,41 @@ const STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 let mongoClientPromise = null;
 
 function getConfig() {
-  let mongoUri = (process.env.MONGODB_URI || '').trim();
-  if (!mongoUri || mongoUri.includes('mongodbraid')) {
-    mongoUri = 'mongodb+srv://gabrieldev07s:IHB1K6fpgBUeAOmu@nyxwaree.lc22vul.mongodb.net/nyxware?retryWrites=true&w=majority';
+  const clientId = (process.env.OAUTH_CLIENT_ID || process.env.DISCORD_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.OAUTH_CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET || '').trim();
+  const rawRedirectUri = (process.env.OAUTH_REDIRECT_URI || process.env.DISCORD_OAUTH_REDIRECT_URI || '').trim();
+  const encryptionSecret = (process.env.OAUTH_TOKEN_SECRET || process.env.TOKEN_ENCRYPTION_KEY || '').trim();
+  const mongoUri = (process.env.MONGODB_URI || '').trim();
+  const botToken = (process.env.DISCORD_TOKEN || '').trim();
+
+  const missing = [];
+  if (!clientId) missing.push('OAUTH_CLIENT_ID');
+  if (!clientSecret) missing.push('OAUTH_CLIENT_SECRET');
+  if (!encryptionSecret) missing.push('OAUTH_TOKEN_SECRET');
+  if (!mongoUri) missing.push('MONGODB_URI');
+
+  if (missing.length > 0) {
+    throw new Error(`Ambiente incompleto no Netlify: ${missing.join(', ')} ausente(s).`);
   }
 
-  let redirectUri = (process.env.OAUTH_REDIRECT_URI || 'https://404callback.netlify.app/oauth/callback').trim();
-  redirectUri = redirectUri.replace(/\/+$/, '');
-  if (!redirectUri.includes('/oauth/callback')) {
-    redirectUri = `${redirectUri}/oauth/callback`;
+  // Canonical redirect URI extraction: Discord requires exact URI registered in portal
+  let canonicalRedirectUri = 'https://404callback.netlify.app/oauth/callback';
+  if (rawRedirectUri) {
+    try {
+      const parsed = new URL(rawRedirectUri);
+      canonicalRedirectUri = `${parsed.origin}/oauth/callback`;
+    } catch (_) {
+      canonicalRedirectUri = 'https://404callback.netlify.app/oauth/callback';
+    }
   }
 
   return {
-    clientId: (process.env.OAUTH_CLIENT_ID || process.env.DISCORD_CLIENT_ID || '1446199362194636800').trim(),
-    clientSecret: (process.env.OAUTH_CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET || 't4iOmvKK97XEI3ph0X1fVI8Ds1Huzo4f').trim(),
-    redirectUri,
-    encryptionSecret: (process.env.OAUTH_TOKEN_SECRET || process.env.TOKEN_ENCRYPTION_KEY || 'e661d4dbe361e3218d21464117efc8b882e1c521e77ff6d9db4833f33a2ac5a9').trim(),
+    clientId,
+    clientSecret,
+    redirectUri: canonicalRedirectUri,
+    encryptionSecret,
     mongoUri,
-    botToken: (process.env.DISCORD_TOKEN || '').trim(),
+    botToken,
   };
 }
 
@@ -48,21 +65,28 @@ function signState(payload) {
 }
 
 function verifyState(state) {
-  const [payload, signature] = String(state || '').split('.');
-
-  if (!payload || !signature) {
-    throw new Error('Parâmetro de segurança (state) inválido ou malformado.');
+  const parts = String(state || '').split('.');
+  if (parts.length !== 2) {
+    throw new Error('Parâmetro de segurança (state) malformado.');
   }
 
+  const [payload, signature] = parts;
   const expected = signState(payload);
+
   const expectedBuffer = Buffer.from(expected);
   const providedBuffer = Buffer.from(signature);
 
+  // Proteção contra Timing Attacks com verificação segura de buffers
   if (expectedBuffer.length !== providedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, providedBuffer)) {
     throw new Error('Assinatura de segurança OAuth2 incompatível. Gere um novo link no servidor.');
   }
 
-  const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  let decoded;
+  try {
+    decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  } catch (_) {
+    throw new Error('Payload state corrompido.');
+  }
 
   if (!decoded.guildId || !decoded.issuedAt || Date.now() - decoded.issuedAt > STATE_MAX_AGE_MS) {
     throw new Error('O link de autorização expirou. Por favor, gere um novo no servidor.');
@@ -78,6 +102,7 @@ async function getDb() {
     mongoClientPromise = new MongoClient(mongoUri, {
       serverSelectionTimeoutMS: 5000,
       connectTimeoutMS: 8000,
+      maxPoolSize: 10,
     }).connect();
   }
 
@@ -91,7 +116,7 @@ async function exchangeCode(code) {
   params.append('client_id', config.clientId);
   params.append('client_secret', config.clientSecret);
   params.append('grant_type', 'authorization_code');
-  params.append('code', code);
+  params.append('code', String(code).trim());
   params.append('redirect_uri', config.redirectUri);
 
   const res = await fetch(`${DISCORD_API}/oauth2/token`, {
@@ -107,11 +132,9 @@ async function exchangeCode(code) {
   } catch (_) {}
 
   if (!res.ok) {
-    let msg = data?.error_description || data?.message || text || `HTTP ${res.status}`;
-    if (data?.error === 'invalid_grant') {
-      msg = 'O código de autorização expirou ou já foi utilizado. Solicite um novo link no Discord.';
-    }
-    const err = new Error(msg);
+    const detail = data?.error_description || data?.message || text || `Discord HTTP ${res.status}`;
+    const err = new Error(detail);
+    err.code = data?.error;
     err.status = res.status;
     err.body = data;
     throw err;
@@ -124,7 +147,7 @@ async function getCurrentUser(accessToken) {
   const res = await fetch(`${DISCORD_API}/users/@me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error('Falha ao consultar usuário no Discord.');
+  if (!res.ok) throw new Error('Falha ao consultar perfil do usuário no Discord.');
   return res.json();
 }
 
@@ -132,14 +155,18 @@ async function saveAuthorization(guildId, tokenData, user) {
   const db = await getDb();
   const now = new Date();
 
+  // Sanitização estrita contra injeção NoSQL
+  const cleanGuildId = String(guildId);
+  const cleanUserId = String(user.id);
+
   await db.collection('oauthmembertokens').updateOne(
-    { guildId, userId: user.id },
+    { guildId: cleanGuildId, userId: cleanUserId },
     {
       $set: {
-        guildId,
-        userId: user.id,
-        username: user.username || null,
-        globalName: user.global_name || null,
+        guildId: cleanGuildId,
+        userId: cleanUserId,
+        username: user.username ? String(user.username) : null,
+        globalName: user.global_name ? String(user.global_name) : null,
         accessToken: encryptToken(tokenData.access_token),
         refreshToken: encryptToken(tokenData.refresh_token),
         tokenType: tokenData.token_type || 'Bearer',
@@ -162,14 +189,17 @@ async function applyVerificationRole(guildId, userId, accessToken) {
     if (!config.botToken) return { applied: false };
 
     const db = await getDb();
-    const guildConfig = await db.collection('guilds').findOne({ guildId });
+    const cleanGuildId = String(guildId);
+    const cleanUserId = String(userId);
+
+    const guildConfig = await db.collection('guilds').findOne({ guildId: cleanGuildId });
     const verification = guildConfig?.verification || {};
 
     if (!verification.enabled || verification.mode !== 'oauth' || !verification.roleId) {
       return { applied: false };
     }
 
-    await fetch(`${DISCORD_API}/guilds/${guildId}/members/${userId}`, {
+    await fetch(`${DISCORD_API}/guilds/${cleanGuildId}/members/${cleanUserId}`, {
       method: 'PUT',
       headers: {
         Authorization: `Bot ${config.botToken}`,
@@ -178,13 +208,13 @@ async function applyVerificationRole(guildId, userId, accessToken) {
       body: JSON.stringify({ access_token: accessToken }),
     }).catch(() => null);
 
-    await fetch(`${DISCORD_API}/guilds/${guildId}/members/${userId}/roles/${verification.roleId}`, {
+    await fetch(`${DISCORD_API}/guilds/${cleanGuildId}/members/${cleanUserId}/roles/${verification.roleId}`, {
       method: 'PUT',
       headers: { Authorization: `Bot ${config.botToken}` },
     }).catch(() => null);
 
     if (verification.preVerificationRoleId) {
-      await fetch(`${DISCORD_API}/guilds/${guildId}/members/${userId}/roles/${verification.preVerificationRoleId}`, {
+      await fetch(`${DISCORD_API}/guilds/${cleanGuildId}/members/${cleanUserId}/roles/${verification.preVerificationRoleId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bot ${config.botToken}` },
       }).catch(() => null);
@@ -213,7 +243,7 @@ export const handler = async (event) => {
     if (!code || !state) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: JSON.stringify({ success: false, error: 'Parâmetros code e state são obrigatórios.' }),
       };
     }
@@ -248,16 +278,17 @@ export const handler = async (event) => {
       }),
     };
   } catch (error) {
-    console.error('[Nyxware API Error]:', error);
+    console.error('[Nyxware Gateway Error]:', error);
     return {
-      statusCode: 500,
+      statusCode: error.status || 500,
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'no-store',
       },
       body: JSON.stringify({
         success: false,
-        error: error.message || 'Falha interna no processamento.',
+        error: error.message || 'Falha interna de autorização.',
+        code: error.code || 'GATEWAY_ERROR',
       }),
     };
   }

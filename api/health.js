@@ -3,25 +3,24 @@ import { MongoClient } from 'mongodb';
 let mongoClientPromise = null;
 
 async function checkDatabase(mongoUri) {
-  let targetUri = mongoUri;
-  if (!targetUri || targetUri.includes('mongodbraid')) {
-    targetUri = 'mongodb+srv://gabrieldev07s:IHB1K6fpgBUeAOmu@nyxwaree.lc22vul.mongodb.net/nyxware?retryWrites=true&w=majority';
+  if (!mongoUri) {
+    return { ok: false, error: 'MONGODB_URI não configurada no ambiente.' };
   }
 
   try {
     if (!mongoClientPromise) {
-      mongoClientPromise = new MongoClient(targetUri, { serverSelectionTimeoutMS: 3000 }).connect();
+      mongoClientPromise = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 3000 }).connect();
     }
     const client = await mongoClientPromise;
     await client.db().command({ ping: 1 });
-    return { ok: true, status: 'connected', cluster: 'nyxwaree.lc22vul.mongodb.net' };
+    return { ok: true, status: 'connected' };
   } catch (err) {
     return { ok: false, error: err.message };
   }
 }
 
 export const handler = async () => {
-  const mongoUri = process.env.MONGODB_URI;
+  const mongoUri = (process.env.MONGODB_URI || '').trim();
   const dbStatus = await checkDatabase(mongoUri);
 
   return {

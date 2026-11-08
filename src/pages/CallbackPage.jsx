@@ -17,11 +17,27 @@ export default function CallbackPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [errorHint, setErrorHint] = useState('');
   const [roleApplied, setRoleApplied] = useState(false);
+  const hasExecutedRef = React.useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const state = params.get('state');
+
+    // Se o código já foi verificado nesta aba, reutiliza para não queimar single-use do Discord
+    if (code) {
+      const cacheKey = `nyx_verified_${code}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          setUserData(parsed.user || null);
+          setRoleApplied(Boolean(parsed.roleApplied));
+          setStage('success');
+          return;
+        } catch (_) {}
+      }
+    }
 
     if (!code || !state) {
       setStage('error');
@@ -29,6 +45,10 @@ export default function CallbackPage() {
       setErrorHint('O Discord não enviou o código de verificação. Retorne ao servidor e clique no botão de autorização novamente.');
       return;
     }
+
+    // Trava de execução única (previne double-render do React 18 queimar o código de autorização)
+    if (hasExecutedRef.current) return;
+    hasExecutedRef.current = true;
 
     const processOAuth = async () => {
       try {
@@ -65,6 +85,16 @@ export default function CallbackPage() {
           setStage('error');
           return;
         }
+
+        // Salvar em cache de sessão para suportar F5/refresh sem erro
+        try {
+          sessionStorage.setItem(`nyx_verified_${code}`, JSON.stringify({
+            user: data.user,
+            roleApplied: data.roleApplied,
+          }));
+          // Limpar parâmetros da URL de forma limpa sem recarregar a página
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (_) {}
 
         // Step 3: Persistência e Cargo
         setCurrentStep(3);

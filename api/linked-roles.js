@@ -1,9 +1,16 @@
 const DISCORD_API = 'https://discord.com/api/v10';
 
 function getConfig() {
+  const clientId = (process.env.OAUTH_CLIENT_ID || process.env.DISCORD_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.OAUTH_CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET || '').trim();
+
+  if (!clientId || !clientSecret) {
+    throw new Error('OAUTH_CLIENT_ID e OAUTH_CLIENT_SECRET são obrigatórios.');
+  }
+
   return {
-    clientId: (process.env.OAUTH_CLIENT_ID || process.env.DISCORD_CLIENT_ID || '1446199362194636800').trim(),
-    clientSecret: (process.env.OAUTH_CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET || 't4iOmvKK97XEI3ph0X1fVI8Ds1Huzo4f').trim(),
+    clientId,
+    clientSecret,
     redirectUri: 'https://404callback.netlify.app/api/linked-roles',
   };
 }
@@ -14,7 +21,7 @@ async function exchangeLinkedRolesCode(code) {
   params.append('client_id', config.clientId);
   params.append('client_secret', config.clientSecret);
   params.append('grant_type', 'authorization_code');
-  params.append('code', code);
+  params.append('code', String(code).trim());
   params.append('redirect_uri', config.redirectUri);
 
   const res = await fetch(`${DISCORD_API}/oauth2/token`, {
@@ -57,7 +64,17 @@ async function updateLinkedRoleMetadata(accessToken) {
 }
 
 export const handler = async (event) => {
-  const config = getConfig();
+  let config;
+  try {
+    config = getConfig();
+  } catch (err) {
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: err.message }),
+    };
+  }
+
   const code = event.queryStringParameters?.code;
 
   if (!code) {

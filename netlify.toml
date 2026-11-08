@@ -23,12 +23,27 @@
   status = 200
 
 [[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
+[[redirects]]
   from = "/api/interactions"
   to = "/.netlify/functions/interactions"
   status = 200
 
 [[redirects]]
+  from = "/interactions"
+  to = "/.netlify/functions/interactions"
+  status = 200
+
+[[redirects]]
   from = "/api/webhooks"
+  to = "/.netlify/functions/webhooks"
+  status = 200
+
+[[redirects]]
+  from = "/webhooks"
   to = "/.netlify/functions/webhooks"
   status = 200
 
@@ -40,6 +55,21 @@
 # 2. Rotas do Frontend SPA (React Vite)
 [[redirects]]
   from = "/oauth/callback"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/privacy"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/terms"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/linked-roles"
   to = "/index.html"
   status = 200
 
