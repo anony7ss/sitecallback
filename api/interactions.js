@@ -1,50 +1,59 @@
-const crypto = require("crypto");
+import crypto from 'crypto';
+
+const DEFAULT_PUBLIC_KEY = 'b5ef1a35ea8bfeafe13b6ebd009975dabb3101681796c986b3a390e3a8a04b5e';
 
 function verifySignature(body, signature, timestamp, clientPublicKey) {
   if (!signature || !timestamp || !clientPublicKey) return false;
   try {
     const publicKeyDer = Buffer.concat([
-      Buffer.from("302a300506032b6570032100", "hex"),
-      Buffer.from(clientPublicKey, "hex"),
+      Buffer.from('302a300506032b6570032100', 'hex'),
+      Buffer.from(clientPublicKey, 'hex'),
     ]);
 
-    const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${publicKeyDer.toString("base64")}\n-----END PUBLIC KEY-----`;
+    const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${publicKeyDer.toString('base64')}\n-----END PUBLIC KEY-----`;
 
     return crypto.verify(
       null,
       Buffer.from(timestamp + body),
       publicKeyPem,
-      Buffer.from(signature, "hex")
+      Buffer.from(signature, 'hex')
     );
   } catch (_) {
     return false;
   }
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== "POST") {
+export const handler = async (event) => {
+  if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Method Not Allowed" }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Method Not Allowed' }),
     };
   }
 
-  const signature = event.headers["x-signature-ed25519"] || event.headers["X-Signature-Ed25519"];
-  const timestamp = event.headers["x-signature-timestamp"] || event.headers["X-Signature-Timestamp"];
-  const rawBody = event.body || "";
+  const headers = event.headers || {};
+  const signature = headers['x-signature-ed25519'];
+  const timestamp = headers['x-signature-timestamp'];
+  const rawBody = event.body || '';
 
-  const publicKey = (process.env.DISCORD_PUBLIC_KEY || "").trim();
+  if (!signature || !timestamp) {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Missing signature headers' }),
+    };
+  }
 
-  if (publicKey) {
-    const isValid = verifySignature(rawBody, signature, timestamp, publicKey);
-    if (!isValid) {
-      return {
-        statusCode: 401,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Invalid request signature" }),
-      };
-    }
+  const publicKey = (process.env.DISCORD_PUBLIC_KEY || DEFAULT_PUBLIC_KEY).trim();
+
+  const isVerified = verifySignature(rawBody, signature, timestamp, publicKey);
+  if (!isVerified) {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Invalid request signature' }),
+    };
   }
 
   let message = {};
@@ -53,8 +62,8 @@ exports.handler = async (event) => {
   } catch (_) {
     return {
       statusCode: 400,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Bad Request" }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Bad Request' }),
     };
   }
 
@@ -62,20 +71,22 @@ exports.handler = async (event) => {
   if (message.type === 1) {
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: 1 }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 1 }), // PONG
     };
   }
 
   return {
     statusCode: 200,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+      type: 4,
       data: {
-        content: "Nyxware Gateway HTTP Endpoint ativo.",
-        flags: 64, // EPHEMERAL
+        content: 'Nyxware Gateway HTTP Endpoint ativo.',
+        flags: 64,
       },
     }),
   };
 };
+
+export default handler;

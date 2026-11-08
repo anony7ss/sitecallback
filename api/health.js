@@ -1,11 +1,11 @@
-const { MongoClient } = require("mongodb");
+import { MongoClient } from 'mongodb';
 
 let mongoClientPromise = null;
 
 async function checkDatabase(mongoUri) {
   let targetUri = mongoUri;
-  if (!targetUri || targetUri.includes("mongodbraid")) {
-    targetUri = "mongodb+srv://gabrieldev07s:IHB1K6fpgBUeAOmu@nyxwaree.lc22vul.mongodb.net/nyxware?retryWrites=true&w=majority";
+  if (!targetUri || targetUri.includes('mongodbraid')) {
+    targetUri = 'mongodb+srv://gabrieldev07s:IHB1K6fpgBUeAOmu@nyxwaree.lc22vul.mongodb.net/nyxware?retryWrites=true&w=majority';
   }
 
   try {
@@ -14,26 +14,26 @@ async function checkDatabase(mongoUri) {
     }
     const client = await mongoClientPromise;
     await client.db().command({ ping: 1 });
-    return { ok: true, status: "connected", cluster: "nyxwaree.lc22vul.mongodb.net" };
+    return { ok: true, status: 'connected', cluster: 'nyxwaree.lc22vul.mongodb.net' };
   } catch (err) {
     return { ok: false, error: err.message };
   }
 }
 
-exports.handler = async () => {
+export const handler = async () => {
   const mongoUri = process.env.MONGODB_URI;
   const dbStatus = await checkDatabase(mongoUri);
 
   return {
     statusCode: 200,
     headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
     },
     body: JSON.stringify({
       ok: dbStatus.ok,
-      system: "Nyxware Identity Gateway",
-      version: "2.5.0",
+      system: 'Nyxware Identity Gateway',
+      version: '2.5.0',
       timestamp: new Date().toISOString(),
       database: dbStatus,
       env: {
@@ -43,7 +43,10 @@ exports.handler = async () => {
         OAUTH_TOKEN_SECRET: Boolean(process.env.OAUTH_TOKEN_SECRET || process.env.TOKEN_ENCRYPTION_KEY),
         MONGODB_URI: Boolean(mongoUri),
         DISCORD_TOKEN: Boolean(process.env.DISCORD_TOKEN),
+        DISCORD_PUBLIC_KEY: Boolean(process.env.DISCORD_PUBLIC_KEY),
       },
     }),
   };
 };
+
+export default handler;
