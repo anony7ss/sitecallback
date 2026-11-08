@@ -36,12 +36,17 @@ function getConfig() {
     }
   }
 
+  let cleanMongoUri = mongoUri;
+  if (cleanMongoUri.includes('mongodbraid')) {
+    cleanMongoUri = cleanMongoUri.replace(/mongodbraid[a-z0-9.]*\.mongodb\.net/i, 'nyxwaree.lc22vul.mongodb.net');
+  }
+
   return {
     clientId,
     clientSecret,
     redirectUri: canonicalRedirectUri,
     encryptionSecret,
-    mongoUri,
+    mongoUri: cleanMongoUri,
     botToken,
   };
 }

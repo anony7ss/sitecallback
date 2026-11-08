@@ -7,9 +7,14 @@ async function checkDatabase(mongoUri) {
     return { ok: false, error: 'MONGODB_URI não configurada no ambiente.' };
   }
 
+  let targetUri = mongoUri;
+  if (targetUri.includes('mongodbraid')) {
+    targetUri = targetUri.replace(/mongodbraid[a-z0-9.]*\.mongodb\.net/i, 'nyxwaree.lc22vul.mongodb.net');
+  }
+
   try {
     if (!mongoClientPromise) {
-      mongoClientPromise = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 3000 }).connect();
+      mongoClientPromise = new MongoClient(targetUri, { serverSelectionTimeoutMS: 3000 }).connect();
     }
     const client = await mongoClientPromise;
     await client.db().command({ ping: 1 });
