@@ -1,7 +1,5 @@
 import crypto from 'crypto';
 
-const DEFAULT_PUBLIC_KEY = 'b5ef1a35ea8bfeafe13b6ebd009975dabb3101681796c986b3a390e3a8a04b5e';
-
 function getHeader(headers, name) {
   if (!headers) return undefined;
   const target = name.toLowerCase();
@@ -50,7 +48,14 @@ export const handler = async (event) => {
     ? Buffer.from(event.body || '', 'base64')
     : Buffer.from(event.body || '', 'utf8');
 
-  const publicKey = (process.env.DISCORD_PUBLIC_KEY || DEFAULT_PUBLIC_KEY).trim();
+  const publicKey = (process.env.DISCORD_PUBLIC_KEY || '').trim();
+  if (!publicKey) {
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'DISCORD_PUBLIC_KEY is not configured in Netlify environment variables.' }),
+    };
+  }
 
   const isVerified = verifySignature(rawBodyBuffer, signature, timestamp, publicKey);
   if (!isVerified) {
@@ -85,7 +90,6 @@ export const handler = async (event) => {
   const eventType = payload.event?.type || payload.type || 'UNKNOWN';
   console.log(`[Nyxware Webhook Event]: ${eventType}`, JSON.stringify(payload));
 
-  // Discord espera 204 No Content ou 200 OK
   return {
     statusCode: 204,
     headers: { 'Content-Type': 'application/json' },

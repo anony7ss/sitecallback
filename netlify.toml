@@ -3,6 +3,10 @@
   publish = "dist"
   functions = "api"
 
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
+  SECRETS_SCAN_OMIT_KEYS = "DISCORD_PUBLIC_KEY,DISCORD_TOKEN,MONGODB_URI,OAUTH_CLIENT_ID,OAUTH_CLIENT_SECRET,OAUTH_REDIRECT_URI,OAUTH_TOKEN_SECRET"
+
 [functions]
   node_bundler = "esbuild"
 
