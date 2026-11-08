@@ -28,7 +28,7 @@ export default function CallbackPage() {
         // Step 2: Criptografia e Estado
         setCurrentStep(2);
 
-        const response = await fetch(`/.netlify/functions/oauth-callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
+        const response = await fetch(`/api/oauth-callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
           headers: {
             'Accept': 'application/json',
           },
