@@ -10,102 +10,135 @@ export default function LinkedRolesPage() {
     window.location.href = '/api/linked-roles';
   };
 
-  return (
-    <div className="min-h-screen bg-[#07080a] text-[#ededed] font-sans antialiased selection:bg-white/[0.08] selection:text-white flex items-center justify-center p-6">
-      {/* Background Micro-Grid */}
-      <div 
-        className="fixed inset-0 pointer-events-none opacity-[0.02]" 
-        style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)`,
-          backgroundSize: '24px 24px',
-        }}
-      />
+  const handleBackToDiscord = () => {
+    window.location.href = 'discord://';
+    setTimeout(() => {
+      try {
+        window.close();
+      } catch (_) {}
+    }, 1200);
+  };
 
-      <div className="w-full max-w-[420px] animate-fade-in relative z-10">
-        <div className="bg-[#0c0d12] border border-white/[0.08] rounded-2xl p-8 text-center shadow-2xl relative overflow-hidden">
-          {/* Top Brand Tag */}
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <div className="w-5 h-5 rounded bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                <path d="M4 4L12 19L20 4" stroke="#ededed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 10L16 4" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <span className="text-[11px] font-mono tracking-wider uppercase text-white/40">
-              DISCORD // LINKED ROLES VERIFICATION
+  return (
+    <div className="min-h-screen min-h-[100dvh] bg-[#060709] text-[#f2f4f8] font-sans antialiased selection:bg-emerald-500/20 selection:text-emerald-300 flex flex-col justify-between items-center px-4 py-6 sm:py-10 safe-top safe-bottom safe-px relative overflow-hidden">
+      {/* Background Ambient Glow */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[340px] sm:w-[600px] h-[340px] sm:h-[600px] bg-emerald-500/5 rounded-full blur-[120px]" />
+        <div 
+          className="absolute inset-0 opacity-[0.025]"
+          style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)`,
+            backgroundSize: '24px 24px',
+          }}
+        />
+      </div>
+
+      {/* Top Header */}
+      <div className="w-full max-w-[420px] flex items-center justify-between text-xs text-white/40 font-mono py-2 relative z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded-md bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+              <path d="M4 4L12 19L20 4" stroke="#f2f4f8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 10L16 4" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <span className="font-semibold tracking-wider text-white/60">NYXWARE</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.03] border border-white/[0.06] text-[10px]">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>LINKED ROLES</span>
+        </div>
+      </div>
+
+      {/* Card Container */}
+      <div className="w-full max-w-[420px] my-auto relative z-10 animate-fade-in-up">
+        <div className="relative bg-[#0c0d13]/80 backdrop-blur-2xl border border-white/[0.09] rounded-3xl p-6 xs:p-7 sm:p-8 text-center shadow-[0_20px_50px_-10px_rgba(0,0,0,0.85)] overflow-hidden">
+          {/* Subtle top edge highlight */}
+          <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.15] to-transparent pointer-events-none" />
+
+          {/* Subheader Pill */}
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.07] mb-6">
+            <Lock className="w-3 h-3 text-emerald-400" />
+            <span className="text-[10px] font-mono tracking-wider uppercase text-white/60">
+              DISCORD CONNECTION
             </span>
           </div>
 
           {isSuccess ? (
             <div className="py-2 animate-fade-in">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4 text-emerald-400">
-                <CheckCircle2 className="w-6 h-6 stroke-[2.2]" />
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4 text-emerald-400 shadow-lg shadow-emerald-500/5">
+                <CheckCircle2 className="w-7 h-7 stroke-[2.2]" />
               </div>
 
-              <h2 className="text-lg font-semibold tracking-tight text-white mb-1.5">
+              <h2 className="text-xl font-bold font-display tracking-tight text-white mb-2">
                 Cargo Vinculado com Sucesso!
               </h2>
-              <p className="text-xs text-[#8e929b] mb-6 leading-relaxed">
-                Seus metadados de verificação foram sincronizados com sua conta do Discord. O cargo configurado no servidor já pode ser reivindicado.
+              <p className="text-xs text-[#8a8f9c] mb-6 leading-relaxed max-w-xs mx-auto">
+                Seus metadados de verificação foram sincronizados com sua conta do Discord. O cargo configurado no servidor já pode ser resgatado.
               </p>
 
               <div className="space-y-3">
-                <a
-                  href="discord://"
-                  className="w-full py-2.5 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-xs font-medium flex items-center justify-center gap-2 transition-all duration-150 border border-white/[0.1] active:scale-[0.99]"
+                <button
+                  type="button"
+                  onClick={handleBackToDiscord}
+                  className="w-full h-12 px-5 rounded-2xl bg-gradient-to-b from-white/[0.12] to-white/[0.04] hover:from-white/[0.18] hover:to-white/[0.08] text-white text-xs sm:text-sm font-semibold font-display flex items-center justify-center gap-2 transition-all duration-150 border border-white/[0.12] active:scale-[0.98] shadow-lg shadow-black/20 cursor-pointer"
                 >
+                  <ArrowLeft className="w-4 h-4 text-white/70" />
                   <span>Voltar para o Discord</span>
-                </a>
+                </button>
               </div>
             </div>
           ) : errorMsg ? (
             <div className="py-2 animate-fade-in">
-              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto mb-4 text-rose-400">
-                <ShieldCheck className="w-6 h-6 stroke-[2.2]" />
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto mb-4 text-rose-400 shadow-lg shadow-rose-500/5">
+                <ShieldCheck className="w-7 h-7 stroke-[2.2]" />
               </div>
 
-              <h2 className="text-lg font-semibold tracking-tight text-white mb-1.5">
+              <h2 className="text-xl font-bold font-display tracking-tight text-white mb-2">
                 Falha na Conexão
               </h2>
-              <p className="text-xs text-[#8e929b] mb-6 leading-relaxed">
+              <p className="text-xs text-[#8a8f9c] mb-6 leading-relaxed max-w-xs mx-auto">
                 {errorMsg}
               </p>
 
               <button
+                type="button"
                 onClick={handleStartOAuth}
-                className="w-full py-2.5 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-xs font-medium flex items-center justify-center gap-2 transition-all duration-150 border border-white/[0.1]"
+                className="w-full h-12 px-5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.09] text-white text-xs sm:text-sm font-semibold font-display flex items-center justify-center gap-2 transition-all duration-150 border border-white/[0.08] active:scale-[0.98] cursor-pointer"
               >
                 <span>Tentar Novamente</span>
               </button>
             </div>
           ) : (
             <div className="py-2">
-              <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center mx-auto mb-5 text-emerald-400">
-                <Lock className="w-6 h-6" />
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-5 text-emerald-400 shadow-lg shadow-emerald-500/5">
+                <Lock className="w-7 h-7" />
               </div>
 
-              <h2 className="text-lg font-semibold tracking-tight text-white mb-1.5">
+              <h2 className="text-xl font-bold font-display tracking-tight text-white mb-2">
                 Vincular Cargo Verificado
               </h2>
-              <p className="text-xs text-[#8e929b] mb-6 leading-relaxed">
-                Este servidor requer a comprovação de identidade segura Nyxware para liberar cargos especiais vinculados.
+              <p className="text-xs text-[#8a8f9c] mb-6 leading-relaxed max-w-xs mx-auto">
+                Este servidor requer a comprovação de identidade segura Nyxware para liberar cargos vinculados de membro.
               </p>
 
               <button
+                type="button"
                 onClick={handleStartOAuth}
-                className="w-full py-2.5 px-4 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-medium flex items-center justify-center gap-2 transition-all duration-150 border border-white/[0.1] active:scale-[0.99]"
+                className="w-full h-12 px-5 rounded-2xl bg-gradient-to-b from-white/[0.12] to-white/[0.04] hover:from-white/[0.18] hover:to-white/[0.08] text-white text-xs sm:text-sm font-semibold font-display flex items-center justify-center gap-2 transition-all duration-150 border border-white/[0.12] active:scale-[0.98] shadow-lg shadow-black/20 cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <Sparkles className="w-4 h-4 text-emerald-400" />
                 <span>Conectar e Verificar no Discord</span>
               </button>
             </div>
           )}
         </div>
+      </div>
 
-        <div className="text-center mt-5 flex items-center justify-center gap-1.5 text-[11px] font-mono text-white/30">
-          <ShieldCheck className="w-3 h-3 text-emerald-400/60" />
-          <span>NYXWARE ROLE CONNECTIONS PROTOCOL</span>
-        </div>
+      {/* Security badge footer */}
+      <div className="w-full max-w-[420px] text-center py-2 flex items-center justify-center gap-1.5 text-[10px] sm:text-[11px] font-mono text-white/30 relative z-10">
+        <Lock className="w-3 h-3 text-emerald-400/60" />
+        <span>NYXWARE ZERO-TRUST VERIFICATION PROTOCOL</span>
       </div>
     </div>
   );

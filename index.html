@@ -1,16 +1,27 @@
 <!doctype html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR" class="dark scroll-smooth">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nyxware • Gateway de Identidade & Verificação</title>
-    <meta name="description" content="Gateway seguro e infraestrutura de autorização OAuth2 para proteção contra raids e restauração de dados no Discord." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <title>Nyxware • Gateway de Identidade &amp; Verificação</title>
+    <meta name="description" content="Infraestrutura de identidade, verificação OAuth2 de alta performance e proteção anti-raid para comunidades Discord." />
+    <meta name="theme-color" content="#07080a" />
+    
+    <!-- iOS Web App Optimization -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Nyxware" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'><path d='M4 4L12 19L20 4' stroke='%23ededed' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/><path d='M12 10L16 4' stroke='%2310b981' stroke-width='2.4' stroke-linecap='round'/></svg>" />
+
+    <!-- Google Fonts: Plus Jakarta Sans, Inter, JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-[#07080a] text-[#ededed] antialiased selection:bg-white/[0.08] selection:text-white min-h-screen">
+  <body class="bg-[#07080a] text-[#ededed] antialiased selection:bg-emerald-500/20 selection:text-emerald-300 min-h-screen min-h-[100dvh] overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

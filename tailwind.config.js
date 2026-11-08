@@ -6,28 +6,23 @@ export default {
   ],
   darkMode: 'class',
   theme: {
+    screens: {
+      xs: '375px',
+      sm: '640px',
+      md: '768px',
+      lg: '1024px',
+      xl: '1280px',
+    },
     extend: {
       colors: {
-        brand: {
-          50: '#f4f5f8',
-          100: '#e5e7ee',
-          200: '#cbd0de',
-          300: '#a3adc5',
-          400: '#7584a7',
-          500: '#53648c',
-          600: '#404e71',
-          700: '#343f5c',
-          800: '#2d354c',
-          900: '#282d41',
-          950: '#1a1d2b',
-        },
-        surface: {
-          base: '#08090d',
-          card: '#0e1017',
-          elevated: '#141720',
-          hover: '#1a1e2a',
+        nyx: {
+          bg: '#060709',
+          card: '#0c0d12',
+          surface: '#12141c',
           border: 'rgba(255, 255, 255, 0.07)',
-          'border-hover': 'rgba(255, 255, 255, 0.14)',
+          'border-focus': 'rgba(255, 255, 255, 0.16)',
+          accent: '#10b981',
+          dim: '#8a8f9c',
         },
       },
       fontFamily: {
@@ -39,15 +34,43 @@ export default {
           'Roboto',
           'sans-serif',
         ],
+        display: [
+          'Plus Jakarta Sans',
+          'Inter',
+          '-apple-system',
+          'sans-serif',
+        ],
+        mono: [
+          'JetBrains Mono',
+          'SFMono-Regular',
+          'Menlo',
+          'Monaco',
+          'Consolas',
+          'monospace',
+        ],
       },
       animation: {
-        'fade-in': 'fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'fade-in': 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'fade-in-up': 'fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'pulse-subtle': 'pulseSubtle 3.5s ease-in-out infinite',
+        'glow-breathe': 'glowBreathe 6s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
-          '0%': { opacity: '0', transform: 'translateY(6px)' },
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        pulseSubtle: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.45' },
+        },
+        glowBreathe: {
+          '0%, 100%': { transform: 'scale(1)', opacity: '0.35' },
+          '50%': { transform: 'scale(1.08)', opacity: '0.6' },
         },
       },
     },
