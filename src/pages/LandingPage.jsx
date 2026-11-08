@@ -83,6 +83,24 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/privacy');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="text-xs text-white/50 hover:text-white transition-colors"
+            >
+              Privacidade
+            </button>
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/terms');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="text-xs text-white/50 hover:text-white transition-colors"
+            >
+              Termos
+            </button>
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#0e1015] border border-white/[0.06] text-xs">
               <span className={`w-1.5 h-1.5 rounded-full ${telemetry.dbOk ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
               <span className="text-white/70 font-mono text-[11px]">
@@ -209,8 +227,26 @@ export default function LandingPage() {
             <span>&bull;</span>
             <span>Identidade e Segurança para Comunidades Discord</span>
           </div>
-          <div className="text-[11px] font-mono text-white/20">
-            SHA-256 ENCRYPTED GATEWAY
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/privacy');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="text-white/40 hover:text-white transition-colors"
+            >
+              PRIVACIDADE
+            </button>
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/terms');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="text-white/40 hover:text-white transition-colors"
+            >
+              TERMOS DE SERVIÇO
+            </button>
+            <span className="text-white/20">SHA-256</span>
           </div>
         </div>
       </footer>
